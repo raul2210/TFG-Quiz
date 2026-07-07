@@ -1,0 +1,2502 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#020617">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <script src="https://cdn.jsdelivr.net/npm/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://code.jquery.com/jquery-2.2.4.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+
+    <title>DronQuiz</title>
+
+    <style>
+        :root {
+            --bg-deep: #020617;
+            --bg-base: #0b1120;
+            --bg-card: #111827;
+            --bg-card2: #1a2540;
+            --bg-glass: rgba(17, 24, 39, 0.85);
+            --accent-cyan: #06d6a0;
+            --accent-cyan-dim: rgba(6, 214, 160, 0.15);
+            --accent-cyan-border: rgba(6, 214, 160, 0.35);
+            --accent-amber: #fbbf24;
+            --accent-amber-dim: rgba(251, 191, 36, 0.15);
+            --accent-red: #f87171;
+            --accent-red-dim: rgba(248, 113, 113, 0.15);
+            --accent-violet: #a78bfa;
+            --accent-violet-dim: rgba(167, 139, 250, 0.15);
+            --accent-violet-border: rgba(167, 139, 250, 0.35);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #475569;
+            --border: rgba(255, 255, 255, 0.07);
+            --border-accent: rgba(6, 214, 160, 0.4);
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+            --radius-xl: 28px;
+            --safe-bottom: env(safe-area-inset-bottom, 16px);
+            --safe-top: env(safe-area-inset-top, 0px);
+            --font-display: 'Syne', sans-serif;
+            --font-body: 'DM Sans', sans-serif;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            min-height: 100dvh;
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ── SCREEN SYSTEM ── */
+        .screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-deep);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 16px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+            z-index: 10;
+        }
+
+        .screen.active {
+            opacity: 1;
+            pointer-events: all;
+            z-index: 20;
+        }
+
+        /* global bg glow */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 60% 40% at 50% 0%, rgba(6, 214, 160, 0.07) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 30% at 80% 80%, rgba(56, 189, 248, 0.05) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── HEADER ── */
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 4px 16px;
+            position: relative;
+            z-index: 2;
+            flex-shrink: 0;
+        }
+
+        .app-logo {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 18px;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--accent-cyan), #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .conn-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 99px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            transition: all 0.3s ease;
+        }
+
+        .conn-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            transition: background 0.3s;
+        }
+
+        .conn-badge.connecting {
+            color: var(--accent-amber);
+            border-color: var(--accent-amber-dim);
+        }
+
+        .conn-badge.connecting .conn-dot {
+            background: var(--accent-amber);
+            animation: pulse-dot 1s infinite;
+        }
+
+        .conn-badge.connected {
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan-border);
+        }
+
+        .conn-badge.connected .conn-dot {
+            background: var(--accent-cyan);
+            box-shadow: 0 0 8px var(--accent-cyan);
+        }
+
+        .conn-badge.error {
+            color: var(--accent-red);
+            border-color: var(--accent-red-dim);
+        }
+
+        .conn-badge.error .conn-dot {
+            background: var(--accent-red);
+        }
+
+        @keyframes pulse-dot {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.4;
+                transform: scale(0.7);
+            }
+        }
+
+        /* ── PANEL ── */
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 24px 20px;
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto 16px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(6, 214, 160, 0.4), transparent);
+        }
+
+        .panel-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin: 0 0 20px;
+        }
+
+        /* ── RADAR PANEL ── */
+        .panel-radar {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 24px 20px;
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto 16px;
+            position: relative;
+            z-index: 2;
+            flex-shrink: 0;
+        }
+
+        /* ── SCREEN NAV BUTTON ── */
+        .btn-action {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 13px 20px;
+            border-radius: var(--radius-md);
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+            margin-bottom: 10px;
+            border: none;
+        }
+
+        .btn-action:active {
+            transform: scale(0.97);
+        }
+
+        /* FULLSCREEN – neutral secondary */
+        .btn-fullscreen {
+            background: var(--bg-card2);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .btn-fullscreen:hover {
+            border-color: var(--border-accent);
+            color: var(--accent-cyan);
+        }
+
+        /* VISITOR – violet accent, visually distinct */
+        .btn-visitor {
+            background: var(--accent-violet-dim);
+            border: 1px solid var(--accent-violet-border);
+            color: var(--accent-violet);
+        }
+
+        .btn-visitor:hover {
+            background: rgba(167, 139, 250, 0.22);
+            border-color: rgba(167, 139, 250, 0.55);
+        }
+
+        /* BACK / EXIT – subdued red */
+        .btn-back {
+            background: var(--accent-red-dim);
+            border: 1px solid rgba(248, 113, 113, 0.35);
+            color: var(--accent-red);
+            margin-top: 8px;
+        }
+
+        .btn-back:hover {
+            background: rgba(248, 113, 113, 0.22);
+        }
+
+        /* ── COLOR BUTTONS ── */
+        .color-section h2 {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 20px;
+            margin: 0 0 6px;
+            letter-spacing: -0.3px;
+        }
+
+        .color-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin: 0 0 20px;
+        }
+
+        #botonesColores {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .color-buttons button {
+            width: 100%;
+            height: 72px;
+            border: 2px solid transparent;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: rgba(0, 0, 0, 0.6);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .color-buttons button:active {
+            transform: scale(0.95);
+        }
+
+        .color-buttons button::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: white;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .color-buttons button:active::after {
+            opacity: 0.2;
+        }
+
+        .boton-verde {
+            background: #22c55e;
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
+        }
+
+        .boton-rojo {
+            background: #ef4444;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        .boton-amarillo {
+            background: #eab308;
+            box-shadow: 0 4px 20px rgba(234, 179, 8, 0.3);
+        }
+
+        .boton-azul {
+            background: #3b82f6;
+            color: rgba(255, 255, 255, 0.7);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        /* ── SELECTED COLOR ── */
+        .selected-color-display {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--bg-card2);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            margin-top: 16px;
+        }
+
+        .selected-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .selected-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin: 0 0 2px;
+        }
+
+        .selected-name {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 15px;
+            text-transform: capitalize;
+        }
+
+        /* ── MAP ── */
+        .map-section-title {
+            font-family: var(--font-display);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin: 0 0 10px;
+        }
+
+        #mapa,
+        #mapaespera,
+        #mapavisita {
+            width: 100%;
+            height: 220px;
+            background: #080e1c;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #mapa::before,
+        #mapaespera::before,
+        #mapavisita::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(rgba(6, 214, 160, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 214, 160, 0.08) 1px, transparent 1px);
+            background-size: 30px 30px;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .map-label-no-data {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .punto {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            transition: left 0.6s ease, top 0.6s ease;
+            z-index: 2;
+        }
+
+        .punto::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid currentColor;
+            opacity: 0.3;
+            animation: ping 2s infinite;
+        }
+
+        @keyframes ping {
+            0% {
+                transform: scale(1);
+                opacity: 0.3;
+            }
+
+            70% {
+                transform: scale(1.8);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1.8);
+                opacity: 0;
+            }
+        }
+
+        .punto.green {
+            background: #22c55e;
+            color: #22c55e;
+            box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+        }
+
+        .punto.red {
+            background: #ef4444;
+            color: #ef4444;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+        }
+
+        .punto.blue {
+            background: #3b82f6;
+            color: #3b82f6;
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+        }
+
+        .punto.yellow {
+            background: #eab308;
+            color: #eab308;
+            box-shadow: 0 0 12px rgba(234, 179, 8, 0.5);
+        }
+
+        .punto.black {
+            background: var(--text-primary);
+            color: var(--text-primary);
+            box-shadow: 0 0 12px rgba(241, 245, 249, 0.4);
+            z-index: 10;
+        }
+
+        .punto.black::before {
+            content: '🚁';
+            position: absolute;
+            top: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 16px;
+        }
+
+        /* ── GAME SCREEN ── */
+        #screenGame {
+            align-items: center;
+        }
+
+        #screenGame .inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 480px;
+        }
+
+        .game-logo-small {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 13px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            align-self: flex-start;
+        }
+
+        #estadoJuego {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 26px;
+            line-height: 1.3;
+            text-align: center;
+            letter-spacing: -0.5px;
+            max-width: 320px;
+            width: 100%;
+        }
+
+        .players-grid {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 24px;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .player-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 99px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .player-chip-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .player-chip.green {
+            border-color: rgba(34, 197, 94, 0.4);
+            color: #86efac;
+        }
+
+        .player-chip.green .player-chip-dot {
+            background: #22c55e;
+            box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+        }
+
+        .player-chip.red {
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+        }
+
+        .player-chip.red .player-chip-dot {
+            background: #ef4444;
+            box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+        }
+
+        .player-chip.blue {
+            border-color: rgba(59, 130, 246, 0.4);
+            color: #93c5fd;
+        }
+
+        .player-chip.blue .player-chip-dot {
+            background: #3b82f6;
+            box-shadow: 0 0 6px rgba(59, 130, 246, 0.6);
+        }
+
+        .player-chip.yellow {
+            border-color: rgba(234, 179, 8, 0.4);
+            color: #fde047;
+        }
+
+        .player-chip.yellow .player-chip-dot {
+            background: #eab308;
+            box-shadow: 0 0 6px rgba(234, 179, 8, 0.6);
+        }
+
+        .waiting-anim {
+            display: flex;
+            gap: 6px;
+            margin-top: 24px;
+        }
+
+        .waiting-anim span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            animation: bounce-dot 1.4s infinite ease-in-out;
+        }
+
+        .waiting-anim span:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .waiting-anim span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .waiting-anim span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce-dot {
+
+            0%,
+            80%,
+            100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+
+            40% {
+                transform: translateY(-8px);
+                opacity: 1;
+            }
+        }
+
+        #contador {
+            margin-top: 24px;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-size: 52px;
+            font-weight: 800;
+            position: relative;
+            letter-spacing: -2px;
+        }
+
+        #contador::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            background: conic-gradient(var(--accent-red) var(--prog, 100%), var(--bg-card2) 0%);
+        }
+
+        #contador::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: var(--bg-deep);
+        }
+
+        .contador-inner {
+            position: relative;
+            z-index: 1;
+            color: var(--accent-red);
+            text-shadow: 0 0 20px rgba(248, 113, 113, 0.5);
+        }
+
+        #contador.urgent .contador-inner {
+            animation: beat 0.5s infinite;
+        }
+
+        @keyframes beat {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.08);
+            }
+        }
+
+        /* ── RESULT + PHOTO – tight layout ── */
+        .result-photo-block {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            max-width: 320px;
+            margin-top: 20px;
+        }
+
+        .result-photo-block.visible {
+            display: flex;
+        }
+
+        .result-inline {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 18px;
+            border-radius: var(--radius-md);
+            background: var(--bg-card2);
+            border: 1px solid var(--border);
+            width: 100%;
+        }
+
+        .result-emoji {
+            font-size: 26px;
+            flex-shrink: 0;
+        }
+
+        .result-text {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 18px;
+            letter-spacing: -0.3px;
+        }
+
+        .result-inline.success {
+            border-color: rgba(6, 214, 160, 0.35);
+        }
+
+        .result-inline.success .result-text {
+            color: var(--accent-cyan);
+        }
+
+        .result-inline.fail {
+            border-color: rgba(248, 113, 113, 0.35);
+        }
+
+        .result-inline.fail .result-text {
+            color: var(--accent-red);
+        }
+
+        #foto {
+            width: 100%;
+            max-width: 320px;
+            border-radius: var(--radius-md);
+            display: none;
+            border: 1px solid var(--border);
+            object-fit: cover;
+        }
+
+        /* ── AUDIO GROUP ── */
+        #audioGroup {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            max-width: 320px;
+            margin-top: 16px;
+        }
+
+        #audioGroup.visible {
+            display: flex;
+        }
+
+        #textoVoz {
+            width: 100%;
+            min-height: 56px;
+            padding: 12px 16px;
+            background: var(--bg-card2);
+            border: 1px solid rgba(6, 214, 160, 0.2);
+            border-radius: var(--radius-md);
+            font-family: var(--font-display);
+            font-size: 15px;
+            line-height: 1.5;
+            font-weight: 500;
+            color: var(--text-primary);
+            overflow-wrap: break-word;
+            word-break: break-word;
+            text-align: center;
+        }
+
+        #textoVoz:empty::before {
+            content: 'Escuchando...';
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        /* REPETIR – cyan */
+        #RepeitrAudio {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: var(--accent-cyan-dim);
+            border: 1px solid var(--accent-cyan-border);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--accent-cyan);
+            letter-spacing: 0.5px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        #RepeitrAudio:active {
+            transform: scale(0.97);
+        }
+
+        #RepeitrAudio:hover {
+            background: rgba(6, 214, 160, 0.22);
+            border-color: rgba(6, 214, 160, 0.55);
+        }
+
+        /* START RECORDING – green, clearly different from stop */
+        #startRecording {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 14px 20px;
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 14px;
+            color: #86efac;
+            letter-spacing: 0.5px;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        #startRecording:hover {
+            background: rgba(34, 197, 94, 0.22);
+            border-color: rgba(34, 197, 94, 0.6);
+        }
+
+        #startRecording:active {
+            transform: scale(0.97);
+        }
+
+        #startRecording::before {
+            content: '🎙️';
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        /* STOP RECORDING – red, clearly different from start */
+        #stopRecording {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 14px 20px;
+            background: var(--accent-red-dim);
+            border: 2px solid rgba(248, 113, 113, 0.5);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--accent-red);
+            letter-spacing: 0.5px;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        #stopRecording:hover {
+            background: rgba(248, 113, 113, 0.25);
+            border-color: rgba(248, 113, 113, 0.7);
+        }
+
+        #stopRecording:active {
+            transform: scale(0.97);
+        }
+
+        #stopRecording::before {
+            content: '⏹';
+            font-size: 18px;
+            flex-shrink: 0;
+            animation: resp-blink 1s infinite;
+        }
+
+        /* ── AUDIO VISUALIZER ── */
+        #audioVisualizer {
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 4px;
+            height: 40px;
+            padding: 0 4px;
+            width: 100%;
+        }
+
+        #audioVisualizer.active {
+            display: flex;
+        }
+
+        .bar {
+            flex: 1;
+            min-width: 4px;
+            max-width: 8px;
+            height: 6px;
+            background: var(--accent-cyan);
+            border-radius: 3px;
+            transition: height 0.08s linear;
+            opacity: 0.8;
+        }
+
+        /* ── DRON BANNER ── */
+        .dron-banner {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(6, 214, 160, 0.1), rgba(56, 189, 248, 0.05));
+            border: 1px solid var(--accent-cyan-border);
+            border-radius: var(--radius-lg);
+            max-width: 320px;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .dron-banner.visible {
+            display: flex;
+        }
+
+        .dron-icon {
+            font-size: 48px;
+            animation: dron-fly 2s ease-in-out infinite;
+        }
+
+        @keyframes dron-fly {
+
+            0%,
+            100% {
+                transform: translateY(0) rotate(-2deg);
+            }
+
+            50% {
+                transform: translateY(-8px) rotate(2deg);
+            }
+        }
+
+        .dron-text {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 18px;
+            text-align: center;
+            color: var(--accent-cyan);
+        }
+
+        .dron-sub {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        /* ── DRON CONTROLS ── */
+        .dron-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            width: 100%;
+            max-width: 320px;
+            margin-top: 16px;
+        }
+
+        .dron-btn {
+            flex: 1 1 calc(50% - 5px);
+            padding: 12px;
+            border: none;
+            border-radius: var(--radius-md);
+            font-family: var(--font-display);
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+
+        .dron-btn:active {
+            transform: scale(0.95);
+        }
+
+        .dron-btn.rojo {
+            background: #ef4444;
+            color: white;
+        }
+
+        .dron-btn.amarillo {
+            background: #eab308;
+            color: black;
+        }
+
+        .dron-btn.verde {
+            background: #22c55e;
+            color: black;
+        }
+
+        .dron-btn.azul {
+            background: #3b82f6;
+            color: white;
+        }
+
+        /* ── TIMER BAR ── */
+        .timer-bar-wrap {
+            width: 100%;
+            max-width: 320px;
+            height: 4px;
+            background: var(--bg-card2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .timer-bar-wrap.visible {
+            display: block;
+        }
+
+        .timer-bar {
+            height: 100%;
+            background: var(--accent-cyan);
+            border-radius: 2px;
+            transition: width 1s linear, background 0.5s;
+            width: 100%;
+        }
+
+        .timer-bar.urgent {
+            background: var(--accent-red);
+        }
+
+        /* ── SCOREBOARD ── */
+        .scoreboard {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            max-width: 320px;
+            margin-top: 20px;
+        }
+
+        .scoreboard.visible {
+            display: flex;
+        }
+
+        .score-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            transition: border-color 0.3s;
+        }
+
+        .score-row.winner {
+            border-color: var(--accent-amber);
+            background: var(--accent-amber-dim);
+        }
+
+        .score-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .score-name {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 14px;
+            flex: 1;
+            text-transform: capitalize;
+        }
+
+        .score-pts {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 16px;
+            color: var(--accent-cyan);
+        }
+
+        .score-row.winner .score-pts {
+            color: var(--accent-amber);
+        }
+
+        /* ── RESPONDING INDICATOR ── */
+        .responding-indicator {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            margin-top: 12px;
+        }
+
+        .responding-indicator.visible {
+            display: flex;
+        }
+
+        .resp-pulse {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .resp-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            animation: resp-blink 1s infinite;
+        }
+
+        @keyframes resp-blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        /* ── PREFERENCES ── */
+        .pref-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-top: 1px solid var(--border);
+            margin-top: 16px;
+        }
+
+        .pref-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toggle-btn {
+            width: 44px;
+            height: 24px;
+            background: var(--bg-card2);
+            border-radius: 12px;
+            position: relative;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            transition: background 0.3s;
+            flex-shrink: 0;
+        }
+
+        .toggle-btn.on {
+            background: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+        }
+
+        .toggle-btn::after {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s;
+        }
+
+        .toggle-btn.on::after {
+            left: 22px;
+        }
+
+        /* ── VISITOR SCREEN ── */
+        #screenVisitor {
+            align-items: center;
+        }
+
+        #screenVisitor .inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 480px;
+        }
+
+        .visitor-video-wrap {
+            width: 100%;
+            max-width: 480px;
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .visitor-video-wrap video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .visitor-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(2, 6, 23, 0.7);
+            flex-direction: column;
+            gap: 8px;
+            font-family: var(--font-display);
+            font-size: 14px;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .visitor-overlay.hidden {
+            display: none;
+        }
+
+        .visitor-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            width: fit-content;
+        }
+
+        .visitor-status .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-violet);
+            animation: resp-blink 1.5s infinite;
+        }
+
+        /* ── SELECTED COLOR COMPACT ── */
+        #gameSelectedColor {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--bg-card2);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            margin-bottom: 16px;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        #gameSelectedColor.show {
+            display: flex;
+        }
+
+        /* ── TOAST ── */
+        .toast-container {
+            position: fixed;
+            bottom: calc(var(--safe-bottom) + 20px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+            width: calc(100% - 40px);
+            max-width: 340px;
+        }
+
+        .toast {
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            font-weight: 600;
+            font-family: var(--font-display);
+            text-align: center;
+            animation: toast-in 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .toast.success {
+            background: rgba(6, 214, 160, 0.15);
+            border-color: rgba(6, 214, 160, 0.4);
+            color: var(--accent-cyan);
+        }
+
+        .toast.error {
+            background: rgba(248, 113, 113, 0.15);
+            border-color: rgba(248, 113, 113, 0.4);
+            color: var(--accent-red);
+        }
+
+        .toast.info {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+        }
+
+        @keyframes toast-in {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* ── DOTS ANIMATION ── */
+        .dots::after {
+            content: "";
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0% {
+                content: "";
+            }
+
+            33% {
+                content: ".";
+            }
+
+            66% {
+                content: "..";
+            }
+
+            100% {
+                content: "...";
+            }
+        }
+
+        /* ── HIDDEN ── */
+        .oculto {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+    <!-- ═══════════════════════════════════════════
+         SCREEN 1: INICIO
+    ════════════════════════════════════════════ -->
+    <div id="screenHome" class="screen active">
+        <header class="app-header">
+            <div class="app-logo">🚁 DronQuiz</div>
+            <div class="conn-badge connecting" id="connBadge">
+                <div class="conn-dot"></div>
+                <span id="connLabel">Conectando</span>
+            </div>
+        </header>
+
+        <div class="panel color-section">
+            <div class="panel-title">Configuración</div>
+            <h2>Elige tu color</h2>
+            <p class="color-subtitle">Selecciona tu equipo para unirte a la partida</p>
+
+            <button class="btn-action btn-fullscreen" onclick="activarPantallaCompleta()">
+                ⛶ Pantalla completa
+            </button>
+
+            <button class="btn-action btn-visitor" onclick="entrarModoVisita()">
+                📡 Modo Visitante
+            </button>
+
+            <button class="btn-action btn-visitor" onclick="ModoPruebas()">
+                Pruebas
+            </button>
+
+            <div class="color-buttons" id="botonesColores">
+                <button class="boton-verde" onclick="setColor('green')" aria-label="Color verde">Verde</button>
+                <button class="boton-rojo" onclick="setColor('red')" aria-label="Color rojo">Rojo</button>
+                <button class="boton-amarillo" onclick="setColor('yellow')" aria-label="Color amarillo">Amarillo</button>
+                <button class="boton-azul" onclick="setColor('blue')" aria-label="Color azul">Azul</button>
+            </div>
+
+            <div class="selected-color-display" id="selectedColorDisplay">
+                <div class="selected-avatar" id="selectedAvatar" style="background:#22c55e;"></div>
+                <div>
+                    <div class="selected-label">Tu color</div>
+                    <div class="selected-name" id="selectedName">verde</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-radar">
+            <div class="map-section-title">Radar en vivo</div>
+            <div id="mapaespera" aria-label="Mapa de posiciones">
+                <div class="map-label-no-data" id="mapNoDataespera">Esperando posiciones...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         SCREEN 2: JUEGO
+    ════════════════════════════════════════════ -->
+    <div id="screenGame" class="screen">
+        <header class="app-header">
+            <div class="app-logo">🚁 DronQuiz</div>
+            <button class="btn-action btn-back" style="width:auto;padding:6px 14px;margin:0;font-size:12px;"
+                onclick="salirJuego()">← Salir</button>
+        </header>
+
+        <div class="inner">
+            <!-- Color badge -->
+            <div id="gameSelectedColor">
+                <div class="selected-avatar" id="gameSelectedAvatar"
+                    style="background:#22c55e; width:28px; height:28px;"></div>
+                <div>
+                    <div class="selected-label" style="font-size:11px;">Tu color</div>
+                    <div class="selected-name" id="gameSelectedName" style="font-size:13px;">verde</div>
+                </div>
+            </div>
+
+            <div id="estadoJuego" class="estado" aria-live="polite">
+                Esperando jugadores <span class="dots"></span>
+            </div>
+
+            <div class="players-grid" id="playersGrid"></div>
+
+            <div class="waiting-anim" id="waitingAnim">
+                <span></span><span></span><span></span>
+            </div>
+
+            <div class="dron-banner" id="dronBanner">
+                <div class="dron-icon">🚁</div>
+                <div class="dron-text" id="dronBannerText"></div>
+                <div class="dron-sub" id="dronBannerSub"></div>
+            </div>
+
+            <!-- Timer bar -->
+            <div class="timer-bar-wrap" id="timerBarWrap">
+                <div class="timer-bar" id="timerBar"></div>
+            </div>
+
+            <!-- Timer circle -->
+            <div id="contador" class="oculto" aria-live="polite" style="--prog:100%">
+                <div class="contador-inner" id="contadorInner">30</div>
+            </div>
+
+            <!-- Responding indicator -->
+            <div class="responding-indicator" id="respondingIndicator">
+                <div class="resp-pulse">
+                    <div class="resp-dot"></div>
+                    <span id="respondingText">Respondiendo...</span>
+                </div>
+            </div>
+            <!-- Scoreboard -->
+            <div class="scoreboard" id="scoreboard"></div>
+
+
+            <!-- Audio group -->
+            <div id="audioGroup">
+                <div id="textoVoz" aria-live="polite"></div>
+                <div id="audioVisualizer" role="img" aria-label="Visualizador de audio">
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                </div>
+                <div id="RepeitrAudio" onclick="playBaseTexto(null)" role="button" aria-label="Repetir pregunta">
+                    🔊 Repetir pregunta
+                </div>
+                <button id="startRecording" onclick="startRecording()">
+                    Volver a grabar
+                </button>
+                <button id="stopRecording" onclick="stopTimer()">
+                    Enviar respuesta
+                </button>
+            </div>
+            <!-- Dron controls -->
+            <div id="dronControls" class="dron-controls oculto">
+                <p id="textoPedirDron" aria-live="polite" style="
+                    width: 100%;
+                    font-family: var(--font-body);
+                    font-size: 13px;
+                    color: var(--text-secondary);
+                    text-align: center;
+                    margin: 0 0 4px;
+                    letter-spacing: 0.2px;
+                ">🚁 ¿A quién envías el dron?</p>
+                <button id="btnRojo" class="dron-btn rojo" onclick="PedirDron('red')">Rojo</button>
+                <button id="btnAmarillo" class="dron-btn amarillo" onclick="PedirDron('yellow')">Amarillo</button>
+                <button id="btnVerde" class="dron-btn verde" onclick="PedirDron('green')">Verde</button>
+                <button id="btnAzul" class="dron-btn azul" onclick="PedirDron('blue')">Azul</button>
+            </div>
+            <!-- Result + Photo in one tight block -->
+            <div class="result-photo-block" id="resultPhotoBlock">
+                <div class="result-inline" id="resultInline">
+                    <span class="result-emoji" id="resultEmoji"></span>
+                    <span class="result-text" id="resultText"></span>
+                </div>
+            </div>
+            <img id="foto" alt="Foto tomada por el dron" />
+
+
+
+            <!-- Radar -->
+            <div class="panel-radar" style="margin-top:20px;">
+                <div class="map-section-title">Radar en vivo</div>
+                <div id="mapa" aria-label="Mapa de posiciones">
+                    <div class="map-label-no-data" id="mapNoData">Esperando posiciones...</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         SCREEN 3: VISITANTE (WebRTC)
+    ════════════════════════════════════════════ -->
+    <div id="screenVisitor" class="screen">
+        <header class="app-header">
+            <div class="app-logo">📡 Visita en vivo</div>
+            <button class="btn-action btn-back" style="width:auto;padding:6px 14px;margin:0;font-size:12px;"
+                onclick="salirModoVisita()">← Salir</button>
+        </header>
+
+        <div class="inner" style="width:100%; max-width:480px; margin:0 auto;">
+            <div class="visitor-status" id="visitorStatus">
+                <div class="dot"></div>
+                <span id="visitorStatusText">Conectando...</span>
+            </div>
+
+            <div class="visitor-video-wrap">
+                <video id="video" autoplay playsinline muted></video>
+                <div class="visitor-overlay" id="visitorOverlay">
+                    <div style="font-size:32px; margin-bottom:4px;">🚁</div>
+                    <span>Esperando señal del dron</span>
+                </div>
+            </div>
+
+            <div class="panel-radar">
+                <div class="map-section-title">Radar en vivo</div>
+                <div id="mapavisita" aria-label="Mapa de posiciones">
+                    <div class="map-label-no-data" id="mapNoDatavisita">Esperando posiciones...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- hidden video for home screen (kept for API compat) -->
+    <video id="videoHidden" autoplay playsinline style="display:none;"></video>
+
+    <script>
+        ///////////////////////////////////////////////////////////
+        //  SONIDO
+        //  Contexto Web Audio API y efectos de sonido (SFX)
+        ///////////////////////////////////////////////////////////
+
+        let soundEnabled = true;  // Permite silenciar todos los sonidos
+        let audioContext = null;  // Instancia compartida de AudioContext
+
+        /** Activa la pantalla completa con soporte cross-browser. */
+        function activarPantallaCompleta() {
+            const el = document.documentElement;
+            if (el.requestFullscreen) el.requestFullscreen();
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            else if (el.msRequestFullscreen) el.msRequestFullscreen();
+        }
+
+        /** Genera un tono sintético con el Web Audio API. */
+        function playTone(freq, duration, type = 'sine', vol = 0.15) {
+            if (!soundEnabled) return;
+            try {
+                const ctx = audioContext;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.frequency.value = freq; osc.type = type;
+                gain.gain.setValueAtTime(vol, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                osc.start(); osc.stop(ctx.currentTime + duration);
+            } catch (e) { }
+        }
+        // Efectos de sonido predefinidos
+        function sfxStart() { playTone(523, 0.1); setTimeout(() => playTone(659, 0.1), 120); setTimeout(() => playTone(784, 0.2), 240); }
+        function sfxCorrect() { playTone(784, 0.1); setTimeout(() => playTone(1047, 0.3), 100); }
+        function sfxWrong() { playTone(220, 0.3, 'sawtooth', 0.1); }
+        function sfxTick() { playTone(1000, 0.05, 'square', 0.05); }
+        function sfxConnect() { playTone(440, 0.08); setTimeout(() => playTone(550, 0.15), 90); }
+        function sfxQuestion() { playTone(600, 0.12); setTimeout(() => playTone(750, 0.2), 130); }
+
+        /** Devuelve (o crea) el AudioContext compartido. Necesario para desbloquearlo con gesto. */
+        function getAudioContext() {
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            return audioContext;
+        }
+
+        ///////////////////////////////////////////////////////////
+        //  NAVEGACIÓN DE PANTALLAS
+        //  Control de qué screen está activa en cada momento
+        ///////////////////////////////////////////////////////////
+
+        /** Activa la pantalla con el id indicado y oculta las demás. */
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        /** Vuelve a la pantalla de inicio restaurando la visibilidad de los botones de color. */
+        function salirJuego() {
+            hideAudioGroup()
+            document.getElementById("botonesColores").style.visibility = "visible";
+            
+            showScreen('screenHome');
+        }
+
+        ///////////////////////////////////////////////////////////
+        //  MODO VISITANTE (WebRTC)
+        //  Streaming de vídeo desde el dron vía WebSocket + RTCPeerConnection
+        ///////////////////////////////////////////////////////////
+
+        let ws = null;   // WebSocket de señalización
+        let pc = null;   // RTCPeerConnection activa
+
+        /** Navega a la pantalla de visitante e inicia la conexión WebRTC. */
+        function entrarModoVisita() {
+            showScreen('screenVisitor');
+            document.getElementById('visitorStatusText').textContent = 'Conectando...';
+            document.getElementById('visitorOverlay').classList.remove('hidden');
+            iniciarWebRTC();
+        }
+
+        /** Cierra WebSocket y PeerConnection, y vuelve a la pantalla de inicio. */
+        function salirModoVisita() {
+            if (ws) {
+                try { ws.send(JSON.stringify({ type: "client-disconnect" })); } catch (e) { }
+                ws.close();
+                ws = null;
+            }
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            const v = document.getElementById('video');
+            v.srcObject = null;
+            document.getElementById('visitorOverlay').classList.remove('hidden');
+            document.getElementById('visitorStatusText').textContent = 'Desconectado';
+            showScreen('screenHome');
+        }
+
+        /** Crea y configura la RTCPeerConnection con servidores STUN/TURN. */
+        function crearPeerConnection() {
+            const config = {
+                iceServers: [
+                    { urls: "stun:stun.relay.metered.ca:80" },
+                    { urls: "turn:standard.relay.metered.ca:80", username: "337f189c0bf26e1022e19f05", credential: "pSwi01maZzQZTUAf" }
+                ]
+            };
+            pc = new RTCPeerConnection(config);
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    ws.send(JSON.stringify({ type: "ice", role: "receptor", candidate: { candidate: event.candidate.candidate, sdpMid: event.candidate.sdpMid ?? "0", sdpMLineIndex: event.candidate.sdpMLineIndex ?? 0 } }));
+                } else {
+                    ws.send(JSON.stringify({ type: "ice", role: "receptor", candidate: null }));
+                }
+            };
+            pc.ontrack = (ev) => {
+                const video = document.getElementById('video');
+                if (ev.streams && ev.streams[0]) {
+                    video.srcObject = ev.streams[0];
+                } else {
+                    const ms = new MediaStream();
+                    ms.addTrack(ev.track);
+                    video.srcObject = ms;
+                }
+                document.getElementById('visitorOverlay').classList.add('hidden');
+                document.getElementById('visitorStatusText').textContent = 'Señal activa';
+            };
+            return pc;
+        }
+
+        /** Procesa mensajes WebSocket: candidatos ICE y descripción SDP del emisor. */
+        async function onMensajeWebSocket(evt) {
+            const data = JSON.parse(evt.data);
+            if (data.type === "ice" && data.role === "emisor") {
+                if (data.candidate) await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                else await pc.addIceCandidate(null);
+                return;
+            }
+            if (data.type === "sdp" && data.role === "emisor") {
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: data.sdp_type, sdp: data.sdp }));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                ws.send(JSON.stringify({ type: "sdp", role: "receptor", sdp: pc.localDescription.sdp, sdp_type: pc.localDescription.type }));
+            }
+        }
+
+        /** Abre el WebSocket de señalización y negocia la conexión WebRTC. */
+        function iniciarWebRTC() {
+            const url = "wss://" + window.location.hostname + ":8110";
+            ws = new WebSocket(url);
+            ws.onmessage = onMensajeWebSocket;
+            ws.onopen = () => {
+                crearPeerConnection();
+                ws.send(JSON.stringify({ type: "peticion" }));
+                document.getElementById('visitorStatusText').textContent = 'Esperando vídeo...';
+            };
+            ws.onerror = () => {
+                document.getElementById('visitorStatusText').textContent = 'Error de conexión';
+            };
+        }
+
+        window.addEventListener("beforeunload", () => {
+            if (ws) { try { ws.send(JSON.stringify({ type: "client-disconnect" })); } catch (e) { } }
+        });
+
+        ///////////////////////////////////////////////////////////
+        //  TOAST (notificaciones temporales)
+        ///////////////////////////////////////////////////////////
+
+        /** Muestra una notificación temporal en la parte inferior de la pantalla. */
+        function showToast(msg, type = 'info', duration = 2500) {
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`; t.textContent = msg;
+            c.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(10px)'; t.style.transition = 'all 0.3s'; setTimeout(() => t.remove(), 300); }, duration);
+        }
+
+        ///////////////////////////////////////////////////////////
+        //  ESTADO GLOBAL Y CONFIGURACIÓN
+        //  Variables de estado de la partida y mapa de colores
+        ///////////////////////////////////////////////////////////
+
+        /** Metadatos visuales de cada color de jugador. */
+        const colorMap = {
+            green: { hex: '#22c55e', label: 'Verde', emoji: '🟢' },
+            red: { hex: '#ef4444', label: 'Rojo', emoji: '🔴' },
+            yellow: { hex: '#eab308', label: 'Amarillo', emoji: '🟡' },
+            blue: { hex: '#3b82f6', label: 'Azul', emoji: '🔵' }
+        };
+
+        // ── Fence fijo del escenario ──────────────────────────────────────
+        // Siempre es el mismo, así que se hardcodea aquí en vez de pedírselo
+        // a la estación de tierra por MQTT.
+        const FENCE = {
+            type: 'polygon',
+            waypoints: [
+                { lat: 41.2764496, lon: 1.9881981 },
+                { lat: 41.2766391, lon: 1.9890323 },
+                { lat: 41.276369, lon: 1.9891557 },
+                { lat: 41.2761654, lon: 1.9883188 }
+            ]
+        };
+
+        // Límites geográficos fijos del radar, calculados a partir del fence
+        // con un margen extra para que el dron y los jugadores se vean aunque
+        // salgan del área del fence. Al ser fijos, el mapa deja de "reajustarse"
+        // según se muevan los jugadores y pasa a representar el escenario real.
+        const FENCE_LATS = FENCE.waypoints.map(p => p.lat);
+        const FENCE_LONS = FENCE.waypoints.map(p => p.lon);
+        const FENCE_MIN_LAT = Math.min(...FENCE_LATS);
+        const FENCE_MAX_LAT = Math.max(...FENCE_LATS);
+        const FENCE_MIN_LON = Math.min(...FENCE_LONS);
+        const FENCE_MAX_LON = Math.max(...FENCE_LONS);
+        const FENCE_MARGIN = 0.4; // 40% de margen alrededor del fence
+        const latSpan = (FENCE_MAX_LAT - FENCE_MIN_LAT) || 0.0001;
+        const lonSpan = (FENCE_MAX_LON - FENCE_MIN_LON) || 0.0001;
+        const MAP_MIN_LAT = FENCE_MIN_LAT - latSpan * FENCE_MARGIN;
+        const MAP_MAX_LAT = FENCE_MAX_LAT + latSpan * FENCE_MARGIN;
+        const MAP_MIN_LON = FENCE_MIN_LON - lonSpan * FENCE_MARGIN;
+        const MAP_MAX_LON = FENCE_MAX_LON + lonSpan * FENCE_MARGIN;
+
+        // Variables de estado de la partida
+        const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+        let color = null;              // Color elegido por este jugador (p.ej. 'green')
+        let users = {};                // Posiciones GPS de todos los jugadores activos
+        let estadoPartida = null;      // Estado actual del servidor ('SelectMode', 'PlayingMode', etc.)
+        let dron = { lat: null, long: null }; // Última posición telemetrada del dron
+
+        ///////////////////////////////////////////////////////////
+        //  HELPERS DE INTERFAZ
+        //  Actualización de elementos visuales del estado del juego
+        ///////////////////////////////////////////////////////////
+
+        /** Actualiza el badge de conexión MQTT (connecting / connected / error). */
+        function setConnStatus(state) {
+            const badge = document.getElementById('connBadge');
+            const label = document.getElementById('connLabel');
+            badge.className = 'conn-badge ' + state;
+            const labels = { connecting: 'Conectando', connected: 'En línea', error: 'Error' };
+            label.textContent = labels[state] || state;
+        }
+
+        /** Regenera los chips de jugadores conectados en la pantalla de juego. */
+        function updatePlayersChips() {
+            const grid = document.getElementById('playersGrid');
+            grid.innerHTML = '';
+            Object.keys(users).forEach(c => {
+                const info = colorMap[c] || { hex: '#888', label: c, emoji: '⚪' };
+                const chip = document.createElement('div');
+                chip.className = `player-chip ${c}`;
+                chip.innerHTML = `<div class="player-chip-dot" style="background:${info.hex}"></div>${info.emoji} ${info.label}`;
+                grid.appendChild(chip);
+            });
+        }
+
+        /** Muestra y reinicia la barra de progreso del temporizador. */
+        function showTimerProgress(total = 30) {
+            document.getElementById('timerBarWrap').classList.add('visible');
+            document.getElementById('timerBar').style.width = '100%';
+            document.getElementById('timerBar').classList.remove('urgent');
+            timerTotal = total;
+        }
+        let timerTotal = 30;
+        function updateTimerProgress(val) {
+            const pct = (val / timerTotal) * 100;
+            const bar = document.getElementById('timerBar');
+            bar.style.width = pct + '%';
+            if (val <= 10) {
+                bar.classList.add('urgent');
+                sfxTick();
+            } else {
+                bar.classList.remove('urgent');
+            }
+        }
+        function hideTimerProgress() {
+            document.getElementById('timerBarWrap').classList.remove('visible');
+        }
+
+        // ── Resultado de respuesta ──
+
+        /** Muestra el bloque de resultado (correcto/incorrecto) con el texto indicado. */
+        function showResult(success, text) {
+            const block = document.getElementById('resultPhotoBlock');
+            block.classList.add('visible');
+            const inline = document.getElementById('resultInline');
+            inline.className = 'result-inline ' + (success ? 'success' : 'fail');
+            document.getElementById('resultEmoji').textContent = success ? '✅' : '❌';
+            document.getElementById('resultText').textContent = text;
+        }
+        function hideResult() {
+            document.getElementById('resultPhotoBlock').classList.remove('visible');
+            document.getElementById('resultInline').className = 'result-inline';
+        }
+
+        /** Renderiza el marcador final con puntuaciones de todos los jugadores. */
+        function showScoreboard(data) {
+            const sb = document.getElementById('scoreboard');
+            sb.classList.add('visible'); sb.innerHTML = '';
+            const winner = data.ganador;
+            if (data.users) {
+                Object.entries(data.users).forEach(([c, pts]) => {
+                    const info = colorMap[c] || { hex: '#888', label: c };
+                    const row = document.createElement('div');
+                    row.className = 'score-row' + (c === winner ? ' winner' : '');
+                    row.innerHTML = `<div class="score-dot" style="background:${info.hex}"></div><div class="score-name">${info.emoji || ''} ${info.label || c}</div><div class="score-pts">${pts} pts</div>`;
+                    sb.appendChild(row);
+                });
+            } else {
+                const row = document.createElement('div');
+                row.className = 'score-row winner';
+                const info = colorMap[winner] || { hex: '#888', label: winner, emoji: '🏆' };
+                row.innerHTML = `<div class="score-dot" style="background:${info.hex}"></div><div class="score-name">${info.emoji} ${info.label || winner}</div><div class="score-pts">${data.puntos} pts</div>`;
+                sb.appendChild(row);
+            }
+        }
+        function hideScoreboard() {
+            document.getElementById('scoreboard').classList.remove('visible');
+            document.getElementById('scoreboard').innerHTML = '';
+        }
+
+        function showWaitingState() {
+            document.getElementById('waitingAnim').style.display = 'flex';
+            document.getElementById('dronBanner').classList.remove('visible');
+            document.getElementById('respondingIndicator').classList.remove('visible');
+        }
+        function hideWaitingState() { document.getElementById('waitingAnim').style.display = 'none'; }
+
+        ///////////////////////////////////////////////////////////
+        //  GRUPO DE AUDIO
+        //  Controla la visibilidad de botones de grabación y TTS
+        ///////////////////////////////////////////////////////////
+
+        /**
+         * Muestra el grupo de audio con visibilidad selectiva de cada control.
+         * @param {boolean} repetir  - Botón "Repetir pregunta"
+         * @param {boolean} start    - Botón "Volver a grabar"
+         * @param {boolean} parar    - Botón "Enviar respuesta"
+         * @param {boolean} texto    - Área de transcripción de voz
+         */
+        function showAudioGroup({ repetir = true, start = true, parar = true, texto = true, visualizador = false } = {}) {
+            document.getElementById("RepeitrAudio").innerHTML = "🔊 Repetir pregunta";
+            const group = document.getElementById('audioGroup');
+            group.classList.add('visible');
+            document.getElementById('RepeitrAudio').style.display = repetir ? 'flex' : 'none';
+            document.getElementById('startRecording').style.display = start ? 'flex' : 'none';
+            document.getElementById('stopRecording').style.display = parar ? 'flex' : 'none';
+            document.getElementById('textoVoz').style.display = texto ? 'block' : 'none';
+            if (visualizador) document.getElementById('audioVisualizer').classList.add('active');
+        }
+        function hideAudioGroup() {
+            document.getElementById('audioGroup').classList.remove('visible');
+            document.getElementById('RepeitrAudio').style.display = 'none';
+            document.getElementById('startRecording').style.display = 'none';
+            document.getElementById('stopRecording').style.display = 'none';
+            document.getElementById('textoVoz').style.display = 'none';
+            document.getElementById('audioVisualizer').classList.remove('active');
+        }
+        /** Modo de prueba de audio: navega al juego y abre el grupo de audio sin partida real. */
+        function ModoPruebas(){
+            showScreen('screenGame'); 
+            showAudioGroup(); 
+            hideWaitingState()
+            textoTTS = "¿Como te encuentras?";
+            document.getElementById("RepeitrAudio").innerHTML = "Escuchar";
+            document.getElementById("estadoJuego").innerHTML = "Prueba tu Audio";
+            document.getElementById('stopRecording').style.display = 'none';
+        }
+        ///////////////////////////////////////////////////////////
+        //  SELECCIÓN DE COLOR Y PERMISOS
+        ///////////////////////////////////////////////////////////
+
+        /**
+         * Solicita permisos de micrófono y geolocalización.
+         * Devuelve true si ambos son concedidos, false si alguno falla.
+         */
+        async function pedirPermisos() {
+            // Micrófono
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+            } catch (e) {
+                return false;
+            }
+
+            // Localización
+            const geoOk = await new Promise((resolve) => {
+                navigator.geolocation.getCurrentPosition(
+                    () => resolve(true),
+                    () => resolve(false)
+                );
+            });
+
+            if (!geoOk) return false;
+
+            return true;
+        }
+
+        // ── COLOR SELECTION ──
+        /** Confirma el color del jugador, pide permisos y navega a la pantalla de juego. */
+        async function setColor(colorF) {
+            const permisos = await pedirPermisos()
+            console.log(permisos)
+            if (!permisos){
+                showToast("Faltan Permisos", 'error');
+                return
+            }
+            if (estadoPartida != "SelectMode") {
+                showToast("No se ha podido conectar", 'error');
+                return;
+            }
+            color = colorF;
+            const info = colorMap[colorF];
+            document.getElementById("botonesColores").style.visibility = "hidden";
+
+            document.getElementById('selectedAvatar').style.background = info.hex;
+            document.getElementById('selectedName').textContent = info.label;
+
+            const gc = document.getElementById('gameSelectedColor');
+            gc.classList.add('show');
+            document.getElementById('gameSelectedAvatar').style.background = info.hex;
+            document.getElementById('gameSelectedName').textContent = info.label;
+
+            showScreen('screenGame');
+            vibrar(100);
+
+            // unlock audio on gesture
+            getAudioContext();
+            sfxConnect();
+
+            iniciarGeolocalizacion();
+            actualizarTextoEspera();
+            showToast(`${info.emoji} Color ${info.label} seleccionado`, 'success');
+        }
+
+        // Flag que se activa tras el primer clic: desbloquea vibración y AudioContext
+        let gestureDesbloqueada = false;
+        document.addEventListener("click", () => { gestureDesbloqueada = true; }, { once: true });
+
+        ///////////////////////////////////////////////////////////
+        //  RECONOCIMIENTO DE VOZ (SpeechRecognition)
+        ///////////////////////////////////////////////////////////
+
+        const output = document.getElementById("textoVoz");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition, finalText = "", reconocimientoListo = false;
+
+        /** Inicializa el objeto SpeechRecognition con la configuración de español. */
+        function initRecognition() {
+            if (!SpeechRecognition) { output.textContent = "Tu navegador no soporta SpeechRecognition."; return; }
+            recognition = new SpeechRecognition();
+            recognition.lang = "es-ES"; recognition.continuous = false; recognition.interimResults = true;
+            recognition.onresult = (event) => {
+                let textoFinal = "", interimText = "";
+                for (let i = 0; i < event.results.length; i++) {
+                    const t = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) textoFinal += t + " ";
+                    else interimText += t;
+                }
+                finalText = textoFinal + "\n" + interimText;
+                output.textContent = finalText;
+            };
+            recognition.onerror = (event) => { console.error(event.error); };
+            reconocimientoListo = true;
+        }
+        /** Reinicia y arranca la grabación de voz. */
+        function startRecording() {
+            finalText = ""; output.textContent = "";
+            if (recognition) recognition.stop();
+            if (!reconocimientoListo) initRecognition();
+            finalText = "";
+            recognition.start();
+            output.textContent = "Escuchando...";
+        }
+        /** Detiene la grabación de voz. */
+        function stopRecording() { if (recognition) recognition.stop(); }
+        /** Publica el topic MQTT para detener el temporizador del servidor. */
+        function stopTimer() { client.publish('mobileFlask/demoDash/PedirStopTimer'); }
+        /** Activa la vibración del dispositivo si el usuario ya ha interactuado. */
+        function vibrar(ms = 300) { if (gestureDesbloqueada && navigator.vibrate) navigator.vibrate(ms); }
+
+        ///////////////////////////////////////////////////////////
+        //  Text-to-Speech
+        ///////////////////////////////////////////////////////////
+
+        let textoTTS = null; // Último texto sintetizado; se reutiliza al pulsar "Repetir"
+
+        /**
+         * Sintetiza voz en español. Si texto es null, repite el último texto guardado.
+         * El delay de 150ms evita el corte de speechSynthesis en móvil.
+         */
+        function playBaseTexto(texto) {
+            if (texto != null) textoTTS = texto;
+            speechSynthesis.cancel();
+            setTimeout(() => {
+                const utterance = new SpeechSynthesisUtterance(textoTTS);
+                utterance.lang = "es-ES"; utterance.volume = 1; utterance.rate = 1; utterance.pitch = 1;
+                speechSynthesis.speak(utterance);
+            }, 150);
+        }
+
+        /** Solicita al servidor el estado actual de la partida via MQTT. */
+        function pedirEstado() { client.publish('mobileFlask/demoDash/PedirState'); }
+        /** Envía el dron al color indicado y oculta los controles. */
+        function PedirDron(c) { client.publish('mobileFlask/demoDash/PedirDron', c); ocultarControlesDron(); }
+
+        ///////////////////////////////////////////////////////////
+        //  ESTADO DEL JUEGO
+        ///////////////////////////////////////////////////////////
+
+        /** Actualiza el texto de espera y refresca los chips de jugadores. */
+        function actualizarTextoEspera() {
+            let iconos = { red: "🔴", blue: "🔵", green: "🟢", yellow: "🟡" };
+            let colores = Object.keys(users);
+            let texto = "⌛ Esperando jugadores <span class='dots'></span>";
+            if (colores.length > 0) texto += "<br>" + colores.map(c => iconos[c] || "⚪ " + c).join(" ");
+            document.getElementById("estadoJuego").innerHTML = texto;
+            updatePlayersChips();
+            showWaitingState();
+        }
+
+        /** Arranca el temporizador visual (barra de progreso). */
+        function mostrarTemporizador() {
+            showTimerProgress(15);
+        }
+        /** Oculta el temporizador visual. */
+        function ocultarTemporizador() {
+            hideTimerProgress();
+        }
+
+        /**
+         * Muestra los botones de control del dron solo para los jugadores
+         * que están en la partida y son diferentes al jugador local.
+         */
+        function mostrarControlesDron() {
+            const container = document.getElementById('dronControls');
+            const botones = { red: document.getElementById('btnRojo'), yellow: document.getElementById('btnAmarillo'), green: document.getElementById('btnVerde'), blue: document.getElementById('btnAzul') };
+            Object.values(botones).forEach(btn => { btn.style.display = 'none'; });
+            Object.keys(users).forEach(c => { if (c === color) return; if (botones[c]) botones[c].style.display = 'block'; });
+            const hayVisible = Object.keys(users).some(c => c !== color);
+            if (hayVisible) container.classList.remove('oculto');
+            else container.classList.add('oculto');
+        }
+        function ocultarControlesDron() {
+            ['btnRojo', 'btnAmarillo', 'btnVerde', 'btnAzul'].forEach(id => { const btn = document.getElementById(id); if (btn) { btn.style.display = 'none'; btn.disabled = false; btn.style.opacity = 1; } });
+            document.getElementById('dronControls').classList.add('oculto');
+        }
+
+        ///////////////////////////////////////////////////////////
+        //  VISUALIZADOR DE AUDIO
+        //  Anima las barras en función del volumen del micrófono
+        ///////////////////////////////////////////////////////////
+
+        let frameVisualizador; // ID de requestAnimationFrame para poder cancelarlo
+
+        /** Arranca la animación del visualizador de audio usando el AnalyserNode. */
+        function iniciarVisualizadorReal(analyser, dataArray) {
+            const barras = document.querySelectorAll("#audioVisualizer .bar");
+            document.getElementById("audioVisualizer").classList.add('active');
+            function animar() {
+                analyser.getByteTimeDomainData(dataArray);
+                let suma = 0;
+                for (let i = 0; i < dataArray.length; i++) suma += Math.abs(dataArray[i] - 128);
+                const volumen = suma / dataArray.length;
+                barras.forEach(bar => { let h = 6 + volumen * 4 + Math.random() * 10; bar.style.height = Math.min(40, h) + "px"; });
+                frameVisualizador = requestAnimationFrame(animar);
+            }
+            animar();
+        }
+        /** Detiene la animación y resetea las barras a altura mínima. */
+        function detenerVisualizador() {
+            cancelAnimationFrame(frameVisualizador);
+            document.querySelectorAll("#audioVisualizer .bar").forEach(bar => { bar.style.height = "6px"; });
+            document.getElementById("audioVisualizer").classList.remove('active');
+        }
+
+        ///////////////////////////////////////////////////////////
+        //  EFECTOS ESPECIALES (confetti y audio externo)
+        ///////////////////////////////////////////////////////////
+
+        /** Reproduce el sonido de inicio de ronda (OGG externo + tono sintético). */
+        function sfxInicio() {
+            let audio = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+            audio.play().catch(() => { });
+            sfxStart();
+        }
+        /** Activa vibración, tono de acierto y lluvia de confetti. */
+        function sfxCorrecto() { vibrar([100, 50, 100]); sfxCorrect(); confetti({ particleCount: 150, spread: 90 }); }
+
+        ///////////////////////////////////////////////////////////
+        //  MQTT: eventos de conexión
+        ///////////////////////////////////////////////////////////
+
+        client.on('connect', () => {
+            setConnStatus('connected'); sfxConnect();
+            showToast('✅ Conectado al servidor', 'success');
+            client.subscribe('demoDash/mobileFlask/#');
+            pedirEstado();
+        });
+        client.on('error', () => { setConnStatus('error'); showToast('❌ Error de conexión', 'error'); });
+        client.on('reconnect', () => { setConnStatus('connecting'); showToast('🔄 Reconectando...', 'info'); });
+
+        ///////////////////////////////////////////////////////////
+        //  MQTT: manejador de mensajes entrantes
+        //  Aquí reside la lógica principal del flujo del juego
+        ///////////////////////////////////////////////////////////
+
+        client.on('message', (topic, message) => {
+            console.log("Mensaje recibido en topic:", topic);
+
+              /////////////////////////
+             //  Mensajes Gnerales  //
+            /////////////////////////
+            // Telemetría de posición del dron
+            if (topic == "demoDash/mobileFlask/telemetryInfo") {
+                let data = JSON.parse(message); dron.lat = data.lat; dron.long = data.lon; dibujar();
+            }
+            // Cambio de estado del servidor (SelectMode, PlayingMode, etc.)
+            else if (topic == "demoDash/mobileFlask/GameState") {
+                estadoPartida = message.toString();
+            }
+            // Actualización de coordenadas de todos los jugadores
+            else if (topic == "demoDash/mobileFlask/Coordenadas") {
+                if (estadoPartida == "SelectMode") {
+                    let data = JSON.parse(message);
+                    Object.entries(data).forEach(([c, value]) => { users[c] = { lat: parseFloat(value.lat), long: parseFloat(value.long) }; });
+                    dibujar(); actualizarTextoEspera();
+                    document.getElementById('mapNoData').style.display = 'none';
+                    document.getElementById('mapNoDataespera').style.display = 'none';
+                    document.getElementById('mapNoDatavisita').style.display = 'none';
+                }
+            }
+              /////////////////////
+             //  Mensajes Quiz  //
+            /////////////////////
+            // Inicio inminente de ronda: notifica al jugador elegido
+            else if (topic == "demoDash/mobileFlask/JuegoEmpieza" && estadoPartida == "PlayingMode" && color != null) {
+                console.log("¡El juego va a empezar!");
+                sfxInicio(); vibrar([300, 100, 300]);
+                hideResult(); hideScoreboard(); hideWaitingState(); hideAudioGroup();
+                const banner = document.getElementById('dronBanner');
+                banner.classList.add('visible');
+                if (message.toString() == color) {
+                    playBaseTexto('¡El dron va a por ti!');
+                    document.getElementById('dronBannerText').textContent = '¡El dron viene hacia ti!';
+                    document.getElementById('dronBannerSub').textContent = 'Prepárate para responder';
+                    document.getElementById("estadoJuego").innerHTML = "🚁 ¡Es tu turno!";
+                    vibrar([200, 100, 200, 100, 200]);
+                    showToast('🚁 ¡El dron te ha elegido!', 'success', 3000);
+                } else {
+                    playBaseTexto('¡El dron ha elegido a otro jugador!');
+                    document.getElementById('dronBannerText').textContent = 'El dron eligió a otro jugador';
+                    document.getElementById('dronBannerSub').textContent = 'Observa y aprende...';
+                    document.getElementById("estadoJuego").innerHTML = "🚁 Esperando al jugador elegido";
+                }
+            }
+            // El dron ha llegado al jugador: solicitar foto tras 8 segundos
+            else if (topic == "demoDash/mobileFlask/DronPreparado" && estadoPartida == "PlayingMode" && color != null) {
+                message = message.toString();
+                if (message == color) {
+                    playBaseTexto('El dron ha llegado, Te tomara un foto en 5 segundos');
+                    setTimeout(() => {
+                        client.publish('mobileFlask/demoDash/PedirFoto');
+                    }, 8000);
+                }
+            }
+            // Foto recibida: mostrar imagen en el móvil
+            else if (topic == "demoDash/mobileFlask/Foto" && estadoPartida == "PlayingMode" && color != null) {
+
+                message = message.toString();
+                const idx = message.indexOf(",");
+                const user = message.substring(0, idx);
+                const foto = message.substring(idx + 1);
+                const isMe = user == color;
+                if (isMe)
+                    playBaseTexto('Mira el movil');
+                else
+                    playBaseTexto('Mira el movil');
+                let base64 = foto.toString().trim().replace(/^data:image\/jpeg;base64,/, "");
+                let img = document.getElementById("foto");
+                img.src = "data:image/jpeg;base64," + base64;
+                img.style.display = "block";
+                setTimeout(() => {
+                    playBaseTexto('Hora de responder la pregunta.');
+                }, 5000);
+                if (isMe) {
+                    setTimeout(() => {
+                        client.publish('mobileFlask/demoDash/PedirPregunta');
+                    }, 9000);
+                }
+
+            }
+            // Envío de pregunta: activa grabación para el jugador seleccionado
+            else if (topic == "demoDash/mobileFlask/Pregunta" && estadoPartida == "PlayingMode" && color != null) {
+                message = message.toString();
+                const idx = message.indexOf(",");
+                const user = message.substring(0, idx);
+                const data = message.substring(idx + 1);
+                const isMe = user == color;
+                document.getElementById('dronBanner').classList.remove('visible');
+                hideWaitingState(); hideResult(); sfxQuestion();
+                if (isMe) {
+                    document.getElementById("estadoJuego").innerHTML = "🎙️ Tu turno — ¡responde!";
+                    document.getElementById('respondingIndicator').classList.remove('visible');
+                    showAudioGroup({ repetir: true, start: true, parar: true, texto: true });
+                } else {
+                    const info = colorMap[user] || { emoji: '⚪', label: user };
+                    document.getElementById("estadoJuego").innerHTML = "🧠 Pregunta activa";
+                    document.getElementById('respondingText').textContent = `${info.emoji} ${info.label} está respondiendo...`;
+                    document.getElementById('respondingIndicator').classList.add('visible');
+                    showAudioGroup({ repetir: true, start: false, parar: false, texto: false });
+                }
+                playBaseTexto(data.toString());
+                mostrarTemporizador();
+                if (isMe) {
+                    setTimeout(() => {
+                            startRecording()
+                            client.publish('mobileFlask/demoDash/PedirStartTimer');
+                    }, 3000);
+                }
+
+            }
+            // Actualización del contador regresivo
+            else if (topic == "demoDash/mobileFlask/TimeActulizer" && estadoPartida == "PlayingMode" && color != null) {
+                let num = parseInt(message.toString());
+                document.getElementById("contadorInner").textContent = num;
+                updateTimerProgress(num);
+            }
+            // El servidor pide detener la grabación y enviar la respuesta
+            else if (topic == "demoDash/mobileFlask/StopRecording" && estadoPartida == "PlayingMode" && color != null) {
+                ocultarTemporizador();
+                document.getElementById('RepeitrAudio').style.display = 'none';
+                message = message.toString();
+                if (message == color) {
+                    hideAudioGroup()
+                    stopRecording();
+
+                    // Enviar la respuesta al servidor vía MQTT
+                    client.publish('mobileFlask/demoDash/Respuesta', finalText);
+                }
+            }
+            // Respuesta correcta
+            else if (topic == "demoDash/mobileFlask/Correcta" && estadoPartida == "PlayingMode" && color != null) {
+                message = message.toString();
+                let colorRecibido = message.split("/")[0];
+                let Respuesta = message.split("/")[1];
+                sfxCorrecto();
+                document.getElementById("estadoJuego").innerHTML = "✅ ¡Correcto!";
+                showResult(true, '¡Respuesta correcta!');
+                playBaseTexto('¡Correcto! La respuesta es: ' + Respuesta);
+                showToast('🎉 ¡Correcto!', 'success');
+                if (color == colorRecibido) mostrarControlesDron();
+            }
+            // Respuesta incorrecta
+            else if (topic == "demoDash/mobileFlask/Incorrecta" && estadoPartida == "PlayingMode" && color != null) {
+                message = message.toString();
+                let colorRecibido = message.split("/")[0];
+                let Respuesta = message.split("/")[1];
+                vibrar(); sfxWrong();
+                document.getElementById("estadoJuego").innerHTML = "❌ Incorrecto";
+                showResult(false, 'Respuesta incorrecta.');
+                playBaseTexto('¡Incorrecto! La respuesta es: ' + Respuesta);
+                showToast('❌ Incorrecto', 'error');
+                setTimeout(() => {
+                    if (color == colorRecibido)
+                        PedirDron("Rnd");
+                }, 8000);
+            }
+            // Resultados finales de la partida
+            else if (topic == "demoDash/mobileFlask/Resultados" && color != null) {
+
+                let data = JSON.parse(message);
+                let ganador = data.ganador;
+                const info = colorMap[ganador] || { emoji: '🏆', label: ganador };
+                document.getElementById("estadoJuego").innerHTML = `🏆 ¡Fin de partida!`;
+                showScoreboard(data); ocultarControlesDron(); hideAudioGroup();
+                showToast(`🏆 Ganador: ${info.emoji} ${info.label}`, 'success', 5000);
+            }
+        });
+
+        ///////////////////////////////////////////////////////////
+        //  GEOLOCALIZACIÓN Y MAPA RADAR
+        ///////////////////////////////////////////////////////////
+
+        /** Arranca watchPosition y publica coordenadas en cada actualización GPS. */
+        function iniciarGeolocalizacion() {
+            navigator.geolocation.watchPosition((position) => {
+                lat = position.coords.latitude; long = position.coords.longitude;
+                publicarCoordenadas();
+            });
+        }
+        let lat, long;
+        /** Publica la posición GPS del jugador al servidor vía MQTT. */
+        function publicarCoordenadas() {
+            if (!lat || !long) return;
+            client.publish('mobileFlask/demoDash/PedirCoordenadas', lat + "," + long + "," + color);
+        }
+
+        /**
+         * Convierte coordenadas GPS a píxeles absolutos dentro del contenedor
+         * del mapa indicado, usando los límites fijos del fence (MAP_MIN_LAT,
+         * MAP_MAX_LAT, MAP_MIN_LON, MAP_MAX_LON) como sistema de referencia,
+         * en vez de la dispersión relativa entre dron y jugadores. Esto hace
+         * que el mapa represente siempre el mismo escenario fijo.
+         * El eje Y se invierte para que "más al norte" (lat mayor) quede arriba.
+         */
+        function convertir(lat, lon, mapaId) {
+            const mapa = document.getElementById(mapaId);
+            return {
+                x: ((lon - MAP_MIN_LON) / (MAP_MAX_LON - MAP_MIN_LON)) * mapa.clientWidth,
+                y: (1 - (lat - MAP_MIN_LAT) / (MAP_MAX_LAT - MAP_MIN_LAT)) * mapa.clientHeight
+            };
+        }
+
+        /** Dibuja (o actualiza) el contorno del fence sobre el mapa indicado. */
+        function dibujarFence(mapaId) {
+            const mapa = document.getElementById(mapaId);
+            let svg = mapa.querySelector('svg.fence-svg');
+            if (!svg) {
+                svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('class', 'fence-svg');
+                svg.style.position = 'absolute';
+                svg.style.inset = '0';
+                svg.style.width = '100%';
+                svg.style.height = '100%';
+                svg.style.pointerEvents = 'none';
+                svg.style.zIndex = '1';
+                const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                poly.setAttribute('fill', 'rgba(6, 214, 160, 0.06)');
+                poly.setAttribute('stroke', 'rgba(6, 214, 160, 0.5)');
+                poly.setAttribute('stroke-width', '2');
+                poly.setAttribute('stroke-dasharray', '6 4');
+                svg.appendChild(poly);
+                mapa.appendChild(svg);
+            }
+            const points = FENCE.waypoints.map(p => {
+                const pos = convertir(p.lat, p.lon, mapaId);
+                return `${pos.x},${pos.y}`;
+            }).join(' ');
+            svg.querySelector('polygon').setAttribute('points', points);
+        }
+
+        /** Redibuja el fence y todos los puntos (jugadores y dron) en los tres mapas radar. */
+        function dibujar() {
+            ['mapa', 'mapaespera', 'mapavisita'].forEach(id => {
+                let mapa = document.getElementById(id);
+                dibujarFence(id);
+                mapa.querySelectorAll('.punto').forEach(p => p.remove());
+                for (let c in users) {
+                    let pos = convertir(users[c].lat, users[c].long, id);
+                    let punto = document.createElement("div");
+                    punto.className = "punto " + c;
+                    punto.style.left = pos.x + "px"; punto.style.top = pos.y + "px";
+                    mapa.appendChild(punto);
+                }
+                if (dron.lat) {
+                    let pos = convertir(dron.lat, dron.long, id);
+                    let punto = document.createElement("div");
+                    punto.className = "punto black";
+                    punto.style.left = pos.x + "px"; punto.style.top = pos.y + "px";
+                    mapa.appendChild(punto);
+                }
+            });
+        }
+
+        // Dibuja el fence en los tres mapas desde el primer momento, aunque
+        // todavía no haya datos de jugadores ni del dron.
+        dibujar();
+    </script>
+</body>
+
+</html>

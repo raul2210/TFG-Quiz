@@ -1,0 +1,48 @@
+# ========================================
+# Sistema de Control de Dron - Dependencias
+# ========================================
+
+# Comunicación y Control
+paho-mqtt==1.6.1
+pyserial==3.5
+
+# Servidor Web y WebSocket
+Flask==2.3.0
+websockets==12.0
+aiortc==1.5.0
+
+# Procesamiento de Imágenes y Video
+opencv-python==4.8.0.76
+Pillow==10.0.0
+av==10.0.0
+
+# Geomátrica y Cálculos
+shapely==2.0.1
+pyproj==3.6.0
+numpy==1.24.0
+
+# Configuración
+PyYAML==6.0
+
+# Computación y Inteligencia Artificial
+torch==2.0.0
+
+# Visión por Computadora (Opcional - comentar si no se usa)
+# torchvision==0.15.0
+# tensorflow==2.13.0
+
+# Utilidades
+requests==2.31.0
+
+# Desarrollo y Testing (Opcional)
+pytest==7.4.0
+black==23.9.0
+flake8==6.0.0
+
+# ========================================
+# Notas:
+# - Asegúrate de tener Python 3.7+
+# - En Linux, instalar: libav-tools, libssl-dev
+# - En Windows, instalar: Visual C++ Build Tools (para aiortc)
+# - Para tkinter en Linux: apt-get install python3-tk
+# ========================================

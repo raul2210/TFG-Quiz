@@ -1,0 +1,9 @@
+{
+    "simulation": false,
+    "distance": 1,
+    "speed": 1,
+    "fishcamera": false,
+    "camera_mode": 0,
+    "zoomargen": 0,
+    "imagenmode": false
+}

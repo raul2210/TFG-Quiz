@@ -866,7 +866,7 @@ class MQTTController:
 
             # ── Todo lo relacionado con el juego se delega a Quiz ──────────
             elif command in ('Respuesta', 'PedirState',
-                              'PedirDron', 'PedirFoto', 'PedirPregunta','PedirStartTimer', 'StopTimer'):
+                              'PedirDron', 'PedirFoto', 'PedirPregunta','PedirStartTimer', 'PedirStopTimer'):
                 quiz.handle_message(command, payload)
 
         except Exception as e:
